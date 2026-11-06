@@ -1,0 +1,8 @@
+# Raw Airbnb source data
+/Data/calendar.csv.gz
+/Data/listings.csv
+/Data/listings.csv.gz
+/Data/neighbourhoods.csv
+/Data/neighbourhoods.geojson
+/Data/reviews.csv
+/Data/reviews.csv.gz

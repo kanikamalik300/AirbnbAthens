@@ -351,7 +351,7 @@ Interpret `avg_estimated_income_last_365d` as the average among listings with bo
 
 ### 18. Which listings can I plot on a map?
 
-This returns coordinates and a few fields for a mapping tool. The GeoJSON neighbourhood polygons are in **neighbourhoods.geojson_geometry**.
+This returns coordinates and a few fields for a mapping tool. The neighbourhood polygons remain in the raw Data/neighbourhoods.geojson file; this schema does not load them into PostgreSQL.
 
 ~~~sql
 SELECT
