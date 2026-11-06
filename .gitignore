@@ -6,3 +6,6 @@
 /Data/neighbourhoods.geojson
 /Data/reviews.csv
 /Data/reviews.csv.gz
+
+# Local PostgreSQL credentials
+/PostgreSQL_credentials/

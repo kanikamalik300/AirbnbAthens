@@ -89,7 +89,7 @@ erDiagram
         integer minimum_maximum_nights
         integer maximum_maximum_nights
         numeric minimum_nights_avg_ntm
-        numeric maximum_nights_avg_ntm
+        numeric(7,2) maximum_nights_avg_ntm
         text calendar_updated
         boolean has_availability
         smallint availability_30
@@ -266,7 +266,7 @@ CREATE TABLE listings (
     minimum_maximum_nights       integer,
     maximum_maximum_nights       integer,
     minimum_nights_avg_ntm       numeric(6,2),
-    maximum_nights_avg_ntm       numeric(6,2),
+    maximum_nights_avg_ntm       numeric(7,2),
     calendar_updated             text,
     has_availability             boolean,
     availability_30              smallint,

@@ -228,7 +228,7 @@ SELECT
     ROUND(AVG(review_scores_value), 2) AS value
 FROM listings
 GROUP BY room_type
-ORDER BY rated_listings DESC;
+ORDER BY listings_with_overall_rating DESC;
 ~~~
 
 ### 13. How often do review comments mention selected topics?
