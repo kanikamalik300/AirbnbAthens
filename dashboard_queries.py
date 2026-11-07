@@ -117,7 +117,9 @@ def get_overview_counts(
                 WHERE l.room_type = 'Entire home/apt'
             ) AS entire_home_count,
             COUNT(l.listing_id) FILTER (
-                WHERE l.license IS NOT NULL AND BTRIM(l.license) <> ''
+                WHERE l.license IS NOT NULL
+                  AND BTRIM(l.license) <> ''
+                  AND LOWER(BTRIM(l.license)) NOT IN ('exempt', 'exempted')
             ) AS license_value_recorded,
             COUNT(l.price_amount) AS listings_with_price
         FROM public.listings AS l
@@ -178,8 +180,7 @@ def get_map_listings(
             l.minimum_nights,
             l.number_of_reviews_ltm AS reviews_last_12_months,
             l.estimated_occupancy_l365d AS estimated_booked_nights,
-            l.estimated_revenue_l365d AS estimated_revenue_year,
-            l.availability_365 AS available_days_next_365
+            l.estimated_revenue_l365d AS estimated_revenue_year
         FROM public.listings AS l
         LEFT JOIN public.neighbourhoods AS n
           ON n.neighbourhood_name = l.neighbourhood_fk
@@ -285,9 +286,11 @@ def get_license_distribution(
         f"""
         SELECT
             CASE
-                WHEN l.license IS NOT NULL AND BTRIM(l.license) <> ''
-                    THEN 'Value recorded'
-                ELSE 'No value recorded'
+                WHEN LOWER(BTRIM(l.license)) IN ('exempt', 'exempted')
+                    THEN 'Marked exempt'
+                WHEN l.license IS NULL OR BTRIM(l.license) = ''
+                    THEN 'Blank'
+                ELSE 'Value recorded'
             END AS license_record,
             COUNT(l.listing_id) AS listing_count
         FROM public.listings AS l
@@ -423,62 +426,4 @@ def get_top_hosts(connection: Any):
         LEFT JOIN public.hosts AS h ON h.host_id = r.host_id
         ORDER BY r.listing_count DESC, r.host_id
         """,
-    )
-
-
-def get_availability_metrics(
-    connection: Any,
-    neighborhoods: Sequence[str] | None,
-    room_types: Sequence[str] | None,
-    activity_only: bool,
-    snapshot_date: date | None,
-    cutoff: int,
-):
-    where, params = _filters(
-        neighborhoods, room_types, activity_only, snapshot_date
-    )
-    params["availability_cutoff"] = cutoff
-    return _query(
-        connection,
-        f"""
-        SELECT
-            COUNT(l.listing_id) AS listing_count,
-            COUNT(l.availability_365) AS listings_with_availability,
-            COUNT(l.listing_id) FILTER (
-                WHERE l.availability_365 >= :availability_cutoff
-            ) AS high_availability_count,
-            AVG(l.availability_365) AS average_available_days
-        FROM public.listings AS l
-        LEFT JOIN public.neighbourhoods AS n
-          ON n.neighbourhood_name = l.neighbourhood_fk
-        {where}
-        """,
-        params,
-    )
-
-
-def get_availability_distribution(
-    connection: Any,
-    neighborhoods: Sequence[str] | None,
-    room_types: Sequence[str] | None,
-    activity_only: bool,
-    snapshot_date: date | None,
-):
-    where, params = _filters(
-        neighborhoods, room_types, activity_only, snapshot_date
-    )
-    return _query(
-        connection,
-        f"""
-        SELECT
-            l.availability_365 AS available_days,
-            COUNT(l.listing_id) AS listing_count
-        FROM public.listings AS l
-        LEFT JOIN public.neighbourhoods AS n
-          ON n.neighbourhood_name = l.neighbourhood_fk
-        {where}
-        GROUP BY l.availability_365
-        ORDER BY l.availability_365 NULLS LAST
-        """,
-        params,
     )

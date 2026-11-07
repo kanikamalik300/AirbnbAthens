@@ -12,8 +12,6 @@ import streamlit as st
 
 from dashboard_queries import (
     get_activity_metrics,
-    get_availability_distribution,
-    get_availability_metrics,
     get_host_summary,
     get_license_distribution,
     get_map_listings,
@@ -32,10 +30,26 @@ from dashboard_queries import (
 ROOT = Path(__file__).resolve().parent
 GEOJSON_PATH = ROOT / "Data" / "neighbourhoods.geojson"
 MAP_CENTER = {"lat": 37.9708, "lon": 23.7383}
+PLOT_COLORS = {
+    "ink": "#26352F",
+    "teal": "#1F665B",
+    "terracotta": "#B96F52",
+    "ochre": "#B89B63",
+    "slate": "#667B89",
+    "sage": "#91A194",
+    "line": "#E5DFD4",
+}
+ROOM_TYPE_COLORS = {
+    "Entire home/apt": PLOT_COLORS["teal"],
+    "Private room": PLOT_COLORS["terracotta"],
+    "Shared room": PLOT_COLORS["ochre"],
+    "Hotel room": PLOT_COLORS["slate"],
+    "Unknown": PLOT_COLORS["sage"],
+}
 
 st.set_page_config(
-    page_title="Athens Airbnb Dashboard",
-    page_icon="🏠",
+    page_title="Athens Airbnb market",
+    page_icon=":material/apartment:",
     layout="wide",
 )
 
@@ -56,6 +70,40 @@ def _float_value(value, default: float = 0.0) -> float:
     if value is None or pd.isna(value):
         return default
     return float(value)
+
+
+def _style_figure(fig: go.Figure) -> go.Figure:
+    fig.update_layout(
+        font={"family": "Arial, sans-serif", "color": PLOT_COLORS["ink"], "size": 13},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        colorway=[
+            PLOT_COLORS["teal"],
+            PLOT_COLORS["terracotta"],
+            PLOT_COLORS["ochre"],
+            PLOT_COLORS["slate"],
+            PLOT_COLORS["sage"],
+        ],
+        hoverlabel={
+            "bgcolor": "#FCFAF5",
+            "bordercolor": PLOT_COLORS["line"],
+            "font": {"color": PLOT_COLORS["ink"]},
+        },
+        legend={"bgcolor": "rgba(0,0,0,0)", "font": {"color": PLOT_COLORS["ink"]}},
+    )
+    fig.update_xaxes(
+        zeroline=False,
+        linecolor=PLOT_COLORS["line"],
+        gridcolor=PLOT_COLORS["line"],
+        tickcolor=PLOT_COLORS["line"],
+    )
+    fig.update_yaxes(
+        zeroline=False,
+        linecolor=PLOT_COLORS["line"],
+        gridcolor=PLOT_COLORS["line"],
+        tickcolor=PLOT_COLORS["line"],
+    )
+    return fig
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -84,7 +132,7 @@ def _add_neighborhood_outlines(fig: go.Figure, geojson: dict) -> go.Figure:
                     lon=[point[0] for point in ring],
                     lat=[point[1] for point in ring],
                     mode="lines",
-                    line={"color": "#64748b", "width": 1},
+                    line={"color": PLOT_COLORS["slate"], "width": 1},
                     hoverinfo="skip",
                     showlegend=False,
                 )
@@ -105,6 +153,7 @@ def _map_figure(listings: pd.DataFrame, geojson: dict) -> go.Figure | None:
         lat="latitude",
         lon="longitude",
         color="room_type",
+        color_discrete_map=ROOM_TYPE_COLORS,
         hover_name="name",
         hover_data={
             "neighborhood": True,
@@ -114,7 +163,6 @@ def _map_figure(listings: pd.DataFrame, geojson: dict) -> go.Figure | None:
             "reviews_last_12_months": True,
             "estimated_booked_nights": True,
             "estimated_revenue_year": True,
-            "available_days_next_365": True,
             "latitude": False,
             "longitude": False,
         },
@@ -128,7 +176,6 @@ def _map_figure(listings: pd.DataFrame, geojson: dict) -> go.Figure | None:
             "reviews_last_12_months": "Reviews in last 12 months",
             "estimated_booked_nights": "Estimated booked nights",
             "estimated_revenue_year": "Estimated revenue (last 365 days)",
-            "available_days_next_365": "Available days (next 365)",
         },
     )
     fig.update_traces(marker={"size": 7, "opacity": 0.68})
@@ -137,7 +184,7 @@ def _map_figure(listings: pd.DataFrame, geojson: dict) -> go.Figure | None:
         margin={"l": 0, "r": 0, "t": 8, "b": 0},
         legend_title_text="Room type",
     )
-    return fig
+    return _style_figure(fig)
 
 
 def _show_empty(frame: pd.DataFrame, message: str) -> bool:
@@ -159,10 +206,10 @@ def _format_euro(value) -> str:
     return f"€{float(value):,.0f}"
 
 
-st.title("Athens Airbnb Dashboard")
-st.caption(
-    "Explore the loaded Inside Airbnb snapshot. Occupancy and revenue are estimates; "
-    "listing locations are approximate."
+st.caption("ATHENS  ·  INSIDE AIRBNB SNAPSHOT")
+st.title("Athens Airbnb market", icon=":material/apartment:")
+st.markdown(
+    "A neighborhood view of listing supply, booking activity, prices, and host portfolios."
 )
 
 try:
@@ -199,7 +246,7 @@ except Exception:
     st.stop()
 
 with st.sidebar:
-    st.header("Filters")
+    st.header("Explore the market", icon=":material/tune:")
     selected_neighborhoods = st.multiselect(
         "Neighborhoods",
         options=neighborhoods,
@@ -221,20 +268,16 @@ with st.sidebar:
         ),
     )
     minimum_nights_cutoff = st.slider(
-        "Minimum-night cutoff",
+        "Short-term rental threshold (minimum nights)",
         min_value=1,
         max_value=60,
         value=28,
-        help="Highlights listings with a minimum stay below this analytic cutoff.",
+        help=(
+            "Listings below this threshold meet the dashboard's short-term "
+            "category. This is an analytic cutoff, not a legal definition."
+        ),
     )
-    high_availability_cutoff = st.slider(
-        "High-availability cutoff (days)",
-        min_value=0,
-        max_value=365,
-        value=180,
-        help="Highlights listings available for at least this many days.",
-    )
-    st.caption("Both cutoffs are exploratory settings, not legal definitions.")
+    st.caption("The short-term rental threshold is an analytic setting, not a legal definition.")
 
 common_args = (
     connection,
@@ -255,10 +298,6 @@ try:
     )
     minimum_nights_distribution = get_minimum_nights_distribution(*common_args)
     map_listings = get_map_listings(*common_args)
-    availability_metrics = _first_row(
-        get_availability_metrics(*common_args, cutoff=high_availability_cutoff)
-    )
-    availability_distribution = get_availability_distribution(*common_args)
     host_summary = _first_row(get_host_summary(connection))
     top_hosts = get_top_hosts(connection)
 except Exception:
@@ -270,13 +309,17 @@ scrape_range = (
     if first_scrape_date is not None and snapshot_date is not None
     else "date unavailable"
 )
-st.caption(
-    f"Database: airbnb_athens · listing scrape dates: {scrape_range} · "
-    f"{_format_integer(metadata.get('listing_count'))} listings"
-)
+with st.container(border=True):
+    metadata_cols = st.columns([1, 1.5, 1], gap="large")
+    metadata_cols[0].caption("DATA SOURCE")
+    metadata_cols[0].markdown("**Inside Airbnb · Athens**")
+    metadata_cols[1].caption("LISTING SCRAPE PERIOD")
+    metadata_cols[1].markdown(f"**{scrape_range}**")
+    metadata_cols[2].caption("LISTINGS IN DATABASE")
+    metadata_cols[2].markdown(f"**{_format_integer(metadata.get('listing_count'))}**")
 
 tabs = st.tabs(
-    ["Overview", "Activity & Pricing", "License & Minimum Nights", "Hosts", "Availability"]
+    ["Overview", "Activity & Pricing", "License", "Short-term Rentals", "Hosts"]
 )
 
 with tabs[0]:
@@ -284,10 +327,10 @@ with tabs[0]:
     entire_homes = _int_value(overview.get("entire_home_count"))
     license_recorded = _int_value(overview.get("license_value_recorded"))
     st.subheader("Listings and neighborhood distribution")
-    metric_cols = st.columns(3)
-    metric_cols[0].metric("Listings in selection", f"{total_listings:,}")
-    metric_cols[1].metric("Entire homes/apartments", f"{entire_homes:,}")
-    metric_cols[2].metric("License values recorded", f"{license_recorded:,}")
+    with st.grid("auto", min_column_width=200, gap="small"):
+        st.metric("Listings in selection", f"{total_listings:,}", border=True)
+        st.metric("Entire homes/apartments", f"{entire_homes:,}", border=True)
+        st.metric("License values recorded", f"{license_recorded:,}", border=True)
 
     chart_col, map_col = st.columns([1, 2], gap="large")
     with chart_col:
@@ -298,6 +341,7 @@ with tabs[0]:
                 x="listing_count",
                 y="room_type",
                 color="room_type",
+                color_discrete_map=ROOM_TYPE_COLORS,
                 orientation="h",
                 labels={"listing_count": "Listings", "room_type": "Room type"},
                 text="listing_count",
@@ -307,6 +351,7 @@ with tabs[0]:
                 yaxis={"categoryorder": "total ascending"},
                 margin={"l": 4, "r": 4, "t": 8, "b": 4},
             )
+            _style_figure(room_fig)
             st.plotly_chart(
                 room_fig,
                 width="stretch",
@@ -345,38 +390,93 @@ with tabs[1]:
     activity_listing_count = _int_value(activity_row.get("listing_count"))
     price_count = _int_value(activity_row.get("listings_with_price"))
     revenue_count = _int_value(activity_row.get("listings_with_revenue"))
-    activity_cols = st.columns(5)
-    activity_cols[0].metric(
-        "Recent & frequent listings" if activity_only else "Listings in selection",
-        f"{activity_listing_count:,}",
-    )
-    activity_cols[1].metric(
-        "Average estimated nights booked",
-        _format_integer(average_nights),
-    )
-    activity_cols[2].metric(
-        "Average estimated occupancy",
-        "—" if average_occupancy is None else f"{average_occupancy:.1f}%",
-    )
-    activity_cols[3].metric(
-        "Average nightly price",
-        _format_euro(activity_row.get("average_nightly_price_eur")),
-        help=(
-            f"Available for {price_count:,} listings; missing for "
-            f"{max(0, activity_listing_count - price_count):,}."
-        ),
-    )
-    activity_cols[4].metric(
-        "Average estimated revenue / year",
-        _format_euro(activity_row.get("average_estimated_revenue_eur")),
-        help=(
-            f"Available for {revenue_count:,} listings; missing for "
-            f"{max(0, activity_listing_count - revenue_count):,}."
-        ),
-    )
+    with st.grid("auto", min_column_width=190, gap="small"):
+        st.metric(
+            "Recent & frequent listings" if activity_only else "Listings in selection",
+            f"{activity_listing_count:,}",
+            border=True,
+        )
+        st.metric(
+            "Average estimated nights booked",
+            _format_integer(average_nights),
+            border=True,
+        )
+        st.metric(
+            "Average estimated occupancy",
+            "—" if average_occupancy is None else f"{average_occupancy:.1f}%",
+            border=True,
+        )
+        st.metric(
+            "Average nightly price",
+            _format_euro(activity_row.get("average_nightly_price_eur")),
+            border=True,
+            help=(
+                f"Available for {price_count:,} listings; missing for "
+                f"{max(0, activity_listing_count - price_count):,}."
+            ),
+        )
+        st.metric(
+            "Average estimated revenue / year",
+            _format_euro(activity_row.get("average_estimated_revenue_eur")),
+            border=True,
+            help=(
+                f"Available for {revenue_count:,} listings; missing for "
+                f"{max(0, activity_listing_count - revenue_count):,}."
+            ),
+        )
     st.caption(
         "Revenue averages use rows with an estimate; missing values are excluded, not treated as zero."
     )
+    st.markdown("#### Room type mix")
+    if not _show_empty(room_counts, "No room types match the selected filters."):
+        room_mix = room_counts.copy()
+        room_mix["room_type"] = room_mix["room_type"].fillna("Unknown")
+        room_mix_total = int(room_mix["listing_count"].sum())
+        room_mix["share_percent"] = (
+            room_mix["listing_count"] / room_mix_total * 100
+            if room_mix_total
+            else 0
+        )
+        room_mix["count_and_share"] = room_mix.apply(
+            lambda row: (
+                f"{int(row['listing_count']):,} "
+                f"({row['share_percent']:.1f}%)"
+            ),
+            axis=1,
+        )
+        room_mix_fig = px.bar(
+            room_mix,
+            x="share_percent",
+            y="room_type",
+            color="room_type",
+            orientation="h",
+            text="count_and_share",
+            color_discrete_map=ROOM_TYPE_COLORS,
+            hover_data={
+                "listing_count": True,
+                "share_percent": ":.1f",
+                "count_and_share": False,
+            },
+            labels={
+                "room_type": "Room type",
+                "share_percent": "Share of selected listings (%)",
+                "listing_count": "Listings",
+            },
+        )
+        room_mix_fig.update_traces(textposition="outside", cliponaxis=False)
+        room_mix_fig.update_layout(
+            margin={"l": 4, "r": 36, "t": 8, "b": 4},
+            xaxis_title="Share of selected listings (%)",
+            yaxis={"categoryorder": "total ascending"},
+        )
+        _style_figure(room_mix_fig)
+        st.plotly_chart(
+            room_mix_fig,
+            width="stretch",
+            config={"displayModeBar": False},
+            alt="Horizontal bar chart of room types with listing counts and percentages",
+        )
+        st.caption("Counts and percentages reflect the current sidebar filters.")
     if not _show_empty(
         occupancy_distribution,
         "No activity estimates match the selected filters.",
@@ -385,6 +485,7 @@ with tabs[1]:
             occupancy_distribution,
             x="nights_bucket",
             y="listing_count",
+            color_discrete_sequence=[PLOT_COLORS["teal"]],
             category_orders={
                 "nights_bucket": [
                     "0",
@@ -407,6 +508,7 @@ with tabs[1]:
             margin={"l": 4, "r": 4, "t": 8, "b": 4},
             xaxis_title="Estimated booked nights in last 365 days",
         )
+        _style_figure(occupancy_fig)
         st.plotly_chart(
             occupancy_fig,
             width="stretch",
@@ -415,155 +517,206 @@ with tabs[1]:
         )
 
 with tabs[2]:
-    st.subheader("Recorded license values and minimum stays")
+    st.subheader("License field values")
     license_row = (
         license_distribution.set_index("license_record")["listing_count"].to_dict()
         if not license_distribution.empty
         else {}
     )
     recorded_count = _int_value(license_row.get("Value recorded"))
-    missing_count = _int_value(license_row.get("No value recorded"))
-    below_cutoff = _int_value(minimum_nights_metrics.get("below_cutoff"))
-    policy_cols = st.columns(3)
-    policy_cols[0].metric("License value recorded", f"{recorded_count:,}")
-    policy_cols[1].metric("No license value recorded", f"{missing_count:,}")
-    policy_cols[2].metric(
-        f"Minimum stay below {minimum_nights_cutoff} nights",
-        f"{below_cutoff:,}",
-    )
+    exempt_count = _int_value(license_row.get("Marked exempt"))
+    blank_count = _int_value(license_row.get("Blank"))
+    with st.grid("auto", min_column_width=200, gap="small"):
+        st.metric("License value recorded", f"{recorded_count:,}", border=True)
+        st.metric("Explicitly marked exempt", f"{exempt_count:,}", border=True)
+        st.metric("Blank license field", f"{blank_count:,}", border=True)
     st.caption(
-        "A recorded value does not verify a license or establish legal status. "
-        "The minimum-night cutoff is an analytic setting."
+        "“Marked exempt” counts only an explicit exempt marker in the raw field. "
+        "A recorded value or marker does not verify legal status."
     )
 
-    license_col, nights_col = st.columns(2, gap="large")
-    with license_col:
-        st.markdown("#### License field coverage")
-        if not license_distribution.empty:
-            license_fig = px.pie(
-                license_distribution,
-                names="license_record",
-                values="listing_count",
-                hole=0.52,
-                color="license_record",
-                color_discrete_map={
-                    "Value recorded": "#2d806d",
-                    "No value recorded": "#d49a4d",
-                },
-            )
-            license_fig.update_layout(margin={"l": 4, "r": 4, "t": 8, "b": 4})
-            st.plotly_chart(
-                license_fig,
-                width="stretch",
-                config={"displayModeBar": False},
-                alt="Donut chart of listings with and without a recorded license value",
-            )
-    with nights_col:
-        st.markdown("#### Listings by minimum nights")
-        if not _show_empty(
-            minimum_nights_distribution,
-            "No minimum-night data matches the selected filters.",
-        ):
-            nights_data = minimum_nights_distribution.copy()
-            nights_data["bucket_label"] = nights_data[
-                "minimum_nights_bucket"
-            ].map(
-                lambda value: (
-                    "Unknown"
-                    if value < 0
-                    else "60+"
-                    if value >= 60
-                    else str(int(value))
-                )
-            )
-            nights_data["cutoff_group"] = nights_data[
-                "minimum_nights_bucket"
-            ].map(
-                lambda value: (
-                    "Unknown"
-                    if value < 0
-                    else "Below cutoff"
-                    if value < minimum_nights_cutoff
-                    else "At or above cutoff"
-                )
-            )
-            nights_fig = px.bar(
-                nights_data,
-                x="minimum_nights_bucket",
-                y="listing_count",
-                color="cutoff_group",
-                custom_data=["bucket_label"],
-                labels={
-                    "minimum_nights_bucket": "Minimum nights",
-                    "listing_count": "Listings",
-                    "cutoff_group": "Analytic cutoff",
-                },
-                color_discrete_map={
-                    "Below cutoff": "#2d806d",
-                    "At or above cutoff": "#52647b",
-                    "Unknown": "#a0a0a0",
-                },
-            )
-            nights_fig.update_traces(
-                hovertemplate="%{customdata[0]} nights<br>%{y:,} listings<extra></extra>"
-            )
-            nights_fig.add_vline(
-                x=minimum_nights_cutoff,
-                line_dash="dash",
-                line_color="#b45309",
-                annotation_text="cutoff",
-            )
-            nights_fig.update_layout(
-                margin={"l": 4, "r": 4, "t": 22, "b": 4},
-                xaxis={"tickmode": "linear", "dtick": 5},
-            )
-            st.plotly_chart(
-                nights_fig,
-                width="stretch",
-                config={"displayModeBar": False},
-                alt="Bar chart of listing counts by minimum nights",
-            )
+    if not license_distribution.empty:
+        license_fig = px.pie(
+            license_distribution,
+            names="license_record",
+            values="listing_count",
+            hole=0.52,
+            color="license_record",
+            color_discrete_map={
+                "Value recorded": PLOT_COLORS["teal"],
+                "Marked exempt": PLOT_COLORS["slate"],
+                "Blank": PLOT_COLORS["ochre"],
+            },
+        )
+        license_fig.update_layout(margin={"l": 4, "r": 4, "t": 8, "b": 4})
+        _style_figure(license_fig)
+        st.plotly_chart(
+            license_fig,
+            width="stretch",
+            config={"displayModeBar": False},
+            alt="Donut chart of license values recorded, explicitly marked exempt, or blank",
+        )
 
 with tabs[3]:
+    st.subheader("Short-term rentals by minimum stay")
+    minimum_total = _int_value(minimum_nights_metrics.get("listing_count"))
+    minimum_valid = _int_value(
+        minimum_nights_metrics.get("listings_with_minimum_nights")
+    )
+    below_cutoff = _int_value(minimum_nights_metrics.get("below_cutoff"))
+    at_or_above_cutoff = max(0, minimum_valid - below_cutoff)
+    missing_minimum = max(0, minimum_total - minimum_valid)
+    below_share = 100 * below_cutoff / minimum_valid if minimum_valid else 0
+    at_or_above_share = (
+        100 * at_or_above_cutoff / minimum_valid if minimum_valid else 0
+    )
+
+    with st.grid("auto", min_column_width=210, gap="small"):
+        st.metric(
+            f"Under {minimum_nights_cutoff} nights (meets threshold)",
+            f"{below_cutoff:,} ({below_share:.1f}%)",
+            border=True,
+        )
+        st.metric(
+            f"{minimum_nights_cutoff}+ nights (longer minimum stay)",
+            f"{at_or_above_cutoff:,} ({at_or_above_share:.1f}%)",
+            border=True,
+        )
+        st.metric("Missing minimum-night value", f"{missing_minimum:,}", border=True)
+    st.caption(
+        f"Percentages use the {minimum_valid:,} listings with a minimum-night value. "
+        "This is an analytic threshold, not a legal classification or proof of actual stay length."
+    )
+
+    if not _show_empty(
+        minimum_nights_distribution,
+        "No minimum-night data matches the selected filters.",
+    ):
+        nights_data = minimum_nights_distribution.copy()
+        nights_data["bucket_label"] = nights_data["minimum_nights_bucket"].map(
+            lambda value: (
+                "Unknown"
+                if value < 0
+                else "60+"
+                if value >= 60
+                else str(int(value))
+            )
+        )
+        nights_data["cutoff_group"] = nights_data["minimum_nights_bucket"].map(
+            lambda value: (
+                "Unknown"
+                if value < 0
+                else "Under threshold"
+                if value < minimum_nights_cutoff
+                else "At or above threshold"
+            )
+        )
+        nights_fig = px.bar(
+            nights_data,
+            x="minimum_nights_bucket",
+            y="listing_count",
+            color="cutoff_group",
+            custom_data=["bucket_label"],
+            labels={
+                "minimum_nights_bucket": "Minimum nights",
+                "listing_count": "Listings",
+                "cutoff_group": "Threshold category",
+            },
+            color_discrete_map={
+                "Under threshold": PLOT_COLORS["teal"],
+                "At or above threshold": PLOT_COLORS["slate"],
+                "Unknown": PLOT_COLORS["sage"],
+            },
+        )
+        nights_fig.update_traces(
+            hovertemplate="%{customdata[0]} nights<br>%{y:,} listings<extra></extra>"
+        )
+        nights_fig.add_vline(
+            x=minimum_nights_cutoff,
+            line_dash="dash",
+            line_color=PLOT_COLORS["terracotta"],
+            annotation_text="threshold",
+        )
+        nights_fig.update_layout(
+            margin={"l": 4, "r": 4, "t": 22, "b": 4},
+            xaxis={"tickmode": "linear", "dtick": 5},
+        )
+        _style_figure(nights_fig)
+        st.plotly_chart(
+            nights_fig,
+            width="stretch",
+            config={"displayModeBar": False},
+            alt="Bar chart of listings by minimum nights and analytic threshold category",
+        )
+
+with tabs[4]:
     st.subheader("Host portfolio")
     host_row = host_summary
-    host_cols = st.columns(3)
-    host_cols[0].metric("Hosts in dataset", _format_integer(host_row.get("host_count")))
-    host_cols[1].metric(
-        "Single-listing hosts",
-        _format_integer(host_row.get("single_listing_hosts")),
-    )
-    host_cols[2].metric(
-        "Multi-listing hosts",
-        _format_integer(host_row.get("multi_listing_hosts")),
-    )
+    with st.grid("auto", min_column_width=200, gap="small"):
+        st.metric(
+            "Hosts in dataset",
+            _format_integer(host_row.get("host_count")),
+            border=True,
+        )
+        st.metric(
+            "Single-listing hosts",
+            _format_integer(host_row.get("single_listing_hosts")),
+            border=True,
+        )
+        st.metric(
+            "Multi-listing hosts",
+            _format_integer(host_row.get("multi_listing_hosts")),
+            border=True,
+        )
     st.caption(
-        "The marketwide host counts and the top-20 ranking are citywide and do not change with sidebar filters."
+        "Single- and multi-listing host totals cover the full dataset. The portfolio chart and table cover only the 20 hosts with the most listings."
     )
     if not _show_empty(top_hosts, "No host records are available."):
-        host_chart = top_hosts.copy()
-        host_chart["host_label"] = host_chart.apply(
-            lambda row: f"{row['host_name']} · {str(row['host_id'])[-5:]}",
-            axis=1,
+        host_distribution = (
+            top_hosts.groupby("listing_count", as_index=False)
+            .agg(host_count=("host_id", "count"))
+            .rename(columns={"listing_count": "listings_per_host"})
+            .sort_values("listings_per_host", ascending=True)
         )
-        sorted_hosts = host_chart.sort_values("listing_count", ascending=True)
+        host_distribution["listings_per_host_label"] = host_distribution[
+            "listings_per_host"
+        ].map(lambda value: f"{int(value):,} listings")
         host_fig = px.bar(
-            sorted_hosts,
-            x="listing_count",
-            y="host_label",
+            host_distribution,
+            x="host_count",
+            y="listings_per_host_label",
             orientation="h",
-            labels={"listing_count": "Listings", "host_label": "Host"},
-            text="listing_count",
+            text="host_count",
+            custom_data=["listings_per_host"],
+            labels={
+                "host_count": "Number of hosts",
+                "listings_per_host_label": "Listings per host",
+            },
+            color_discrete_sequence=[PLOT_COLORS["teal"]],
         )
         host_fig.update_layout(
-            yaxis={"categoryorder": "array", "categoryarray": sorted_hosts["host_label"].tolist()},
+            yaxis={
+                "categoryorder": "array",
+                "categoryarray": host_distribution[
+                    "listings_per_host_label"
+                ].tolist(),
+                "title": "Listings per host (top 20)",
+            },
+            xaxis_title="Number of hosts",
             margin={"l": 4, "r": 4, "t": 8, "b": 4},
         )
+        host_fig.update_traces(
+            hovertemplate=(
+                "%{x} host(s)<br>%{customdata[0]} listings per host"
+                "<extra></extra>"
+            )
+        )
+        _style_figure(host_fig)
         st.plotly_chart(
             host_fig,
             width="stretch",
             config={"displayModeBar": False},
-            alt="Horizontal bar chart of the 20 hosts with the most Athens listings",
+            alt="Horizontal bar chart showing the number of top-20 hosts at each listings-per-host count",
         )
         st.markdown("#### Listing mix for the top 20 hosts")
         display_hosts = top_hosts.rename(
@@ -585,59 +738,13 @@ with tabs[3]:
                 "Hotel rooms",
             ]
         ]
-        st.dataframe(display_hosts, hide_index=True, width="stretch")
-
-with tabs[4]:
-    st.subheader("Availability")
-    availability_row = availability_metrics
-    available_count = _int_value(availability_row.get("listings_with_availability"))
-    high_count = _int_value(availability_row.get("high_availability_count"))
-    high_share = 100 * high_count / available_count if available_count else 0
-    availability_cols = st.columns(3)
-    availability_cols[0].metric(
-        "Listings with availability data",
-        f"{available_count:,}",
-    )
-    availability_cols[1].metric(
-        f"Available at least {high_availability_cutoff} days",
-        f"{high_count:,}",
-    )
-    availability_cols[2].metric("Share of listings with data", f"{high_share:.1f}%")
-    st.caption(
-        "Availability comes from the listing snapshot’s availability_365 field; it is not booking history."
-    )
-    availability_data = availability_distribution.dropna(subset=["available_days"])
-    if not _show_empty(
-        availability_data,
-        "No availability data matches the selected filters.",
-    ):
-        availability_fig = px.bar(
-            availability_data,
-            x="available_days",
-            y="listing_count",
-            labels={
-                "available_days": "Available days in next 365",
-                "listing_count": "Listings",
-            },
-        )
-        availability_fig.add_vline(
-            x=high_availability_cutoff,
-            line_dash="dash",
-            line_color="#b45309",
-            annotation_text="high-availability cutoff",
-        )
-        availability_fig.update_layout(
-            margin={"l": 4, "r": 4, "t": 22, "b": 4},
-            xaxis={"tickmode": "linear", "dtick": 30, "range": [0, 365]},
-        )
-        st.plotly_chart(
-            availability_fig,
+        st.dataframe(
+            display_hosts,
+            hide_index=True,
             width="stretch",
-            config={"displayModeBar": False},
-            alt="Bar chart showing listings by available days in the next 365",
+            alt="Top 20 Athens hosts and their listings by room type",
         )
 
-st.divider()
 st.caption(
     "Inside Airbnb source data: occupancy and revenue are estimates; locations are approximate. "
     "This local dashboard does not establish legal license status."

@@ -62,6 +62,7 @@ These questions extend the current dashboard topics using fields and tables in t
 
 ## Data boundaries to keep in view
 
-- The database stores a raw license value. It can answer which listings have a value recorded, but that alone does not establish legal compliance or exemption status.
+- The database stores a raw license value. The current dashboard can distinguish a nonblank value, an explicit exempt marker, and a blank field; none of these alone establishes legal compliance or exemption status.
+- The loaded Athens snapshot contains 160 explicit exempt markers; this raw-field label does not establish legal exemption.
 - The project has a single listing snapshot, so it cannot show historical changes in total listing supply.
 - Occupancy and revenue fields are estimates; calendar availability is not booking history.

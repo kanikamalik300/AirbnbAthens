@@ -7,11 +7,10 @@ Local Streamlit dashboard for the loaded airbnb_athens PostgreSQL database.
 - Python 3.13
 - PostgreSQL with the airbnb_athens database loaded
 
-Create and activate a virtual environment from the project root:
+Create the `uv` environment from the project root and install the requirements:
 
-    py -3.13 -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    python -m pip install -r requirements.txt
+    py -3.13 -m uv venv --python 3.13 .venv
+    py -3.13 -m uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 
 ## Database access
 
@@ -42,14 +41,15 @@ For the current Windows account in this workspace, the read-only role and user-l
 
 From the project root:
 
-    streamlit run app.py --server.address 127.0.0.1
+    .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
 
-The dashboard shows the listing scrape date range stored in PostgreSQL. It uses the availability_365 summary field for the availability panel and does not load the larger daily calendar table.
+The dashboard shows the listing scrape date range stored in PostgreSQL. It queries listing summaries and does not load the larger daily calendar table.
 
 ## Definitions and limitations
 
 - “Recent and frequently booked” means a review within six months of the latest listing scrape and at least 60 estimated booked nights in the last 365 days.
-- The default minimum-night cutoff is fewer than 28 nights. The default high-availability cutoff is at least 180 available days. Both are adjustable analytic settings, not legal definitions.
-- License data is shown only as value recorded or no value recorded.
+- The default short-term threshold is fewer than 28 minimum nights. Listings at or above the threshold are shown as having a longer minimum stay. Percentages use only listings with a minimum-night value; this is an analytic category, not a legal definition or proof of actual stay length.
+- License data is shown as value recorded, explicitly marked exempt, or blank. “Marked exempt” only reflects an explicit marker in the raw field and does not verify legal status.
+- The loaded Athens file has 160 explicit exempt markers, 14,463 other recorded values, and 511 blank values.
 - The top-host ranking is citywide and limited to the 20 hosts with the most listings. Marketwide single-listing and multi-listing counts remain citywide.
 - Occupancy and revenue are estimates. Missing price or revenue values are excluded from averages, not treated as zero. Listing coordinates are approximate.

@@ -23,6 +23,9 @@ $$;
 GRANT CONNECT ON DATABASE airbnb_athens TO airbnb_dashboard_ro;
 GRANT USAGE ON SCHEMA public TO airbnb_dashboard_ro;
 
+REVOKE SELECT (availability_365)
+    ON TABLE public.listings FROM airbnb_dashboard_ro;
+
 GRANT SELECT (
     listing_id,
     host_id,
@@ -35,7 +38,6 @@ GRANT SELECT (
     room_type,
     price_amount,
     minimum_nights,
-    availability_365,
     number_of_reviews_ltm,
     estimated_occupancy_l365d,
     estimated_revenue_l365d,

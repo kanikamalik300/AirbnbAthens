@@ -16,8 +16,9 @@ The questions below are paired with the visual used to explore them. Booking act
 
 - How many listings are entire homes or apartments, private rooms, shared rooms, or hotel rooms?
 - How does the mix change when viewing entire homes or apartments only?
+- What count and percentage of the selected listings does each room type represent?
 
-**Visual:** Horizontal bar chart showing listing counts by room type, alongside the interactive map.
+**Visual:** Horizontal bar charts showing listing counts and percentages by room type in Overview and Activity & Pricing, alongside the interactive map.
 
 ## Booking activity, prices, and estimated income
 
@@ -28,39 +29,31 @@ The questions below are paired with the visual used to explore them. Booking act
 
 **Visual:** Bar chart (a binned distribution) of listings by estimated occupancy, summary metric cards for averages, and listing popups for individual details. Filters also update the map.
 
-## License status
+## License field values
 
-- How many listings are marked unlicensed, licensed, exempt, or pending?
-- What share of listings are marked unlicensed, and where do those listings appear?
-- How does the license-status mix vary across the map and listing types?
+- How many listings have a license value recorded, an explicit exempt marker, or a blank value?
+- What share of the selected listings falls into each raw-field category?
 
-**Visual:** Donut chart showing listing counts by license status, with the map and filters for location and listing details.
+**Visual:** Donut chart and count cards for value recorded, explicitly marked exempt, and blank. The raw field does not establish legal status.
+
+The loaded Athens snapshot contains 160 explicit exempt markers; this is a raw-field category, not legal verification.
 
 ## Minimum stays and short-term rentals
 
 - How many listings have each minimum-night setting?
-- Under the dashboard’s short-term-rental threshold, how many listings are classified as short-term versus longer-term rentals?
-- What share meets the short-term-rental definition, and where are those listings concentrated?
-- Are many listings set for longer stays, and where are they concentrated?
+- Under the adjustable dashboard threshold, how many listings meet the short-term category versus have a threshold-length-or-longer minimum stay?
+- What percentage of listings with a minimum-night value falls below versus at or above the threshold?
+- Where are individual listings with longer minimum stays located?
 
-**Visual:** Bar chart showing listing counts by minimum nights, with the short-term-rental threshold indicated when configured; summary metrics and map filters show the related shares and locations.
+**Visual:** Dedicated “Short-term Rentals” section with percentage-and-count metrics and a bar chart of listings by minimum nights. The cutoff is an analytic setting, not a legal definition or proof of actual stay length.
 
 ## Listings per host and top hosts
 
 - How many listings are associated with single-listing hosts versus multi-listing hosts?
-- How does the count of listings per host break down, from two listings through larger portfolios?
+- How many of the top 20 hosts have each portfolio size?
 - Which hosts have the largest listing portfolios, and what mix of room types do they list?
-- Where are listings from multi-listing hosts concentrated?
 
-**Visual:** Bar chart showing the distribution of listings per host; summary metrics for single- and multi-listing hosts; and a table of top hosts with counts by room type.
-
-## Availability
-
-- How many listings are highly available, and what share of filtered listings do they represent?
-- How many days are listings available in the next 365 days, and how does availability vary across the map and listing types?
-- Where are highly available entire homes or apartments concentrated?
-
-**Visual:** Bar chart showing listing counts by number of available days, a high-availability summary metric and filter, and the interactive map.
+**Visual:** Bar chart with number of hosts on the x-axis and listings per host on the y-axis for the top 20 hosts; summary metrics for single- and multi-listing hosts remain marketwide, with a table of the top 20 hosts and their room-type counts.
 
 ## Questions the dashboard raises but cannot settle by itself
 
@@ -69,6 +62,5 @@ The questions below are paired with the visual used to explore them. Booking act
 - Are exemption claims false, or how much does Airbnb earn from any particular listing?
 - Has the market shifted toward longer stays over time, and was any shift caused by regulation avoidance or changing travel demand?
 - Do multi-listing hosts operate businesses, live elsewhere, or violate local law?
-- Does high calendar availability mean a home is unoccupied by its owner or illegally rented?
 
 The charts can show listing attributes and estimates related to these questions, but cannot establish causation, verify legal compliance, or confirm actual occupancy and income. The dashboard also warns that listing locations are not exact and that occupancy and revenue are estimated.
