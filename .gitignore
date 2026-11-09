@@ -13,4 +13,5 @@
 # Local dashboard environment and secrets
 /.venv/
 /.streamlit/secrets.toml
+/Dashboard/.streamlit/secrets.toml
 __pycache__/

@@ -6,11 +6,11 @@ Build a private, interactive Streamlit dashboard with Plotly charts, using the l
 
 ## Implementation
 
-- Create `app.py` for the dashboard and `dashboard_queries.py` for parameterized PostgreSQL queries. Use a shared neighborhood and room-type filter across the map and relevant panels.
+- Create `Dashboard/app.py` for the dashboard and `Dashboard/dashboard_queries.py` for parameterized PostgreSQL queries. Use a shared neighborhood and room-type filter across the map and relevant panels.
 - Organize the page into Overview, Activity & Pricing, License, Short-term Rentals, and Hosts sections. Use an interactive listing map with the local neighborhood GeoJSON, plus the chart types described in the question file.
-- Use the existing `listings` and `hosts` tables. Do not fetch the 5.5M-row calendar table. Add a one-time setup script for an `airbnb_dashboard_ro` login with `SELECT` access only to required columns. PostgreSQL supports separate roles and column-level `SELECT` grants. [CREATE ROLE](https://www.postgresql.org/docs/18/sql-createrole.html) · [GRANT](https://www.postgresql.org/docs/18/sql-grant.html)
+- Use the existing `listings` and `hosts` tables. Do not fetch the 5.5M-row calendar table. Add `Dashboard/Database/create_dashboard_readonly.sql` as a one-time setup script for an `airbnb_dashboard_ro` login with `SELECT` access only to required columns. PostgreSQL supports separate roles and column-level `SELECT` grants. [CREATE ROLE](https://www.postgresql.org/docs/18/sql-createrole.html) · [GRANT](https://www.postgresql.org/docs/18/sql-grant.html)
 - Connect through Streamlit’s SQL connection, with credentials in a user-local secrets file outside the repo. Cache query results for five minutes. Streamlit’s SQL connection uses SQLAlchemy; Plotly figures render through `st.plotly_chart`, and `st.cache_data` is intended for caching query results. [SQL connections](https://docs.streamlit.io/develop/concepts/connections/connecting-to-data) · [Plotly charts](https://docs.streamlit.io/develop/api-reference/charts/st.plotly_chart) · [Caching](https://docs.streamlit.io/develop/concepts/architecture/caching)
-- Start locally with `streamlit run app.py --server.address 127.0.0.1`. There will be no public API or public hosting in V1.
+- Start locally from `Dashboard` with `..\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1` so Streamlit picks up `Dashboard/.streamlit/config.toml`. There will be no public API or public hosting in V1.
 
 ## Definitions and Data Handling
 
@@ -33,4 +33,4 @@ Build a private, interactive Streamlit dashboard with Plotly charts, using the l
 
 - V1 uses the core question file only. The sentiment tables are empty, while `instant_bookable` and host response/acceptance fields have no populated values, so those views are excluded.
 - The database remains a single loaded snapshot; refreshing data means reloading the database, not historical trend tracking.
-- Runtime dependencies are declared in `requirements.txt`; the local Windows environment is managed with `uv`.
+- Runtime dependencies are declared in `Dashboard/requirements.txt`; the local Windows environment is managed with `uv`.

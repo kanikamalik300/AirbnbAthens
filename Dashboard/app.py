@@ -27,7 +27,7 @@ from dashboard_queries import (
 )
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 GEOJSON_PATH = ROOT / "Data" / "neighbourhoods.geojson"
 MAP_CENTER = {"lat": 37.9708, "lon": 23.7383}
 PLOT_COLORS = {
@@ -336,28 +336,52 @@ with tabs[0]:
     with chart_col:
         st.markdown("#### Listing mix by room type")
         if not _show_empty(room_counts, "No listings match the selected filters."):
+            room_mix = room_counts.copy()
+            room_mix["room_type"] = room_mix["room_type"].fillna("Unknown")
+            room_mix_total = int(room_mix["listing_count"].sum())
+            room_mix["share_percent"] = (
+                room_mix["listing_count"] / room_mix_total * 100
+                if room_mix_total
+                else 0
+            )
+            room_mix["count_and_share"] = room_mix.apply(
+                lambda row: (
+                    f"{int(row['listing_count']):,} "
+                    f"({row['share_percent']:.1f}%)"
+                ),
+                axis=1,
+            )
             room_fig = px.bar(
-                room_counts,
+                room_mix,
                 x="listing_count",
                 y="room_type",
                 color="room_type",
                 color_discrete_map=ROOM_TYPE_COLORS,
                 orientation="h",
-                labels={"listing_count": "Listings", "room_type": "Room type"},
-                text="listing_count",
+                labels={
+                    "listing_count": "Listings",
+                    "room_type": "Room type",
+                    "share_percent": "Share of selected listings (%)",
+                },
+                hover_data={"share_percent": ":.1f"},
+                text="count_and_share",
             )
+            max_count = int(room_mix["listing_count"].max())
+            room_fig.update_traces(textposition="outside", cliponaxis=False)
             room_fig.update_layout(
                 showlegend=False,
                 yaxis={"categoryorder": "total ascending"},
-                margin={"l": 4, "r": 4, "t": 8, "b": 4},
+                xaxis={"range": [0, max_count * 2]},
+                margin={"l": 4, "r": 48, "t": 8, "b": 4},
             )
             _style_figure(room_fig)
             st.plotly_chart(
                 room_fig,
                 width="stretch",
                 config={"displayModeBar": False},
-                alt="Horizontal bar chart of listings by room type",
+                alt="Listings by room type, with counts and shares of the filtered selection",
             )
+            st.caption("Counts and percentages reflect the current sidebar filters.")
     with map_col:
         st.markdown("#### Approximate listing locations")
         if map_listings.empty:

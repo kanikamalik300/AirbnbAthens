@@ -10,13 +10,13 @@ Local Streamlit dashboard for the loaded airbnb_athens PostgreSQL database.
 Create the `uv` environment from the project root and install the requirements:
 
     py -3.13 -m uv venv --python 3.13 .venv
-    py -3.13 -m uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+    py -3.13 -m uv pip install --python .venv\Scripts\python.exe -r Dashboard\requirements.txt
 
 ## Database access
 
 The dashboard uses the restricted airbnb_dashboard_ro role. From PowerShell, run the setup SQL as a PostgreSQL administrator:
 
-    psql -h 127.0.0.1 -U postgres -d airbnb_athens -f DB/create_dashboard_readonly.sql
+    psql -h 127.0.0.1 -U postgres -d airbnb_athens -f Dashboard/Database/create_dashboard_readonly.sql
 
 Set a password interactively so it is not written into project files or shell history:
 
@@ -39,9 +39,10 @@ For the current Windows account in this workspace, the read-only role and user-l
 
 ## Run
 
-From the project root:
+From the project root, start the app from `Dashboard` so Streamlit loads its local theme configuration:
 
-    .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
+    Set-Location Dashboard
+    ..\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
 
 The dashboard shows the listing scrape date range stored in PostgreSQL. It queries listing summaries and does not load the larger daily calendar table.
 
