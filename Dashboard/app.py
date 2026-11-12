@@ -1,4 +1,4 @@
-"""Local, read-only Streamlit dashboard for the Athens Airbnb snapshot."""
+"""Streamlit dashboard backed by a packaged, read-only Athens snapshot."""
 
 from __future__ import annotations
 
@@ -28,8 +28,9 @@ from dashboard_queries import (
 )
 
 
-ROOT = Path(__file__).resolve().parent.parent
-GEOJSON_PATH = ROOT / "Data" / "neighbourhoods.geojson"
+APP_DIR = Path(__file__).resolve().parent
+SNAPSHOT_PATH = APP_DIR / "athens_snapshot.sqlite"
+GEOJSON_PATH = APP_DIR / "neighbourhoods.geojson"
 MAP_CENTER = {"lat": 37.9708, "lon": 23.7383}
 PLOT_COLORS = {
     "ink": "#26352F",
@@ -71,6 +72,13 @@ def _float_value(value, default: float = 0.0) -> float:
     if value is None or pd.isna(value):
         return default
     return float(value)
+
+
+def _date_value(value):
+    if value is None or pd.isna(value):
+        return None
+    parsed = pd.to_datetime(value, errors="coerce")
+    return None if pd.isna(parsed) else parsed.date()
 
 
 def _style_figure(fig: go.Figure) -> go.Figure:
@@ -214,22 +222,24 @@ st.markdown(
 )
 
 try:
-    connection = st.connection("airbnb_db", type="sql")
+    if not SNAPSHOT_PATH.is_file():
+        raise FileNotFoundError("The packaged snapshot file is missing.")
+    connection = SNAPSHOT_PATH
     metadata = _first_row(get_metadata(connection))
     if not metadata or metadata.get("listing_count") is None:
-        st.error("The airbnb_athens database did not return listing data.")
+        st.error("The packaged Athens snapshot did not return listing data.")
         st.stop()
 except Exception:
-    st.error("Could not connect to the local airbnb_athens database.")
+    st.error("Could not open the packaged Athens data snapshot.")
     st.info(
-        "Configure the airbnb_db connection in your user-local Streamlit secrets "
-        "file, then start the app again. See README.md for setup steps."
+        "The snapshot file is missing or unreadable. See README.md for instructions "
+        "to rebuild it from the local database."
     )
     st.stop()
 
-snapshot_date = metadata.get("latest_listing_scrape")
-first_scrape_date = metadata.get("first_listing_scrape")
-if snapshot_date is None or pd.isna(snapshot_date):
+snapshot_date = _date_value(metadata.get("latest_listing_scrape"))
+first_scrape_date = _date_value(metadata.get("first_listing_scrape"))
+if snapshot_date is None:
     snapshot_date = None
     st.warning(
         "The database has no listing scrape date; recent-activity filtering is unavailable."
@@ -243,7 +253,7 @@ try:
         get_room_type_options(connection)["room_type"].dropna().tolist()
     )
 except Exception:
-    st.error("Could not load the dashboard filter options from PostgreSQL.")
+    st.error("Could not load the dashboard filter options from the snapshot.")
     st.stop()
 
 with st.sidebar:

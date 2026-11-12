@@ -1,50 +1,52 @@
 # Athens Airbnb Dashboard
 
-Local Streamlit dashboard for the loaded airbnb_athens PostgreSQL database.
+Streamlit dashboard for an Athens Airbnb data snapshot.
 
 ## Requirements
 
 - Python 3.13
-- PostgreSQL with the airbnb_athens database loaded
+- PostgreSQL is needed only when refreshing the packaged snapshot
 
 Create the `uv` environment from the project root and install the requirements:
 
     py -3.13 -m uv venv --python 3.13 .venv
     py -3.13 -m uv pip install --python .venv\Scripts\python.exe -r Dashboard\requirements.txt
 
-## Database access
+## Packaged snapshot
 
-The dashboard uses the restricted airbnb_dashboard_ro role. From PowerShell, run the setup SQL as a PostgreSQL administrator:
+The app runs from `Dashboard/athens_snapshot.sqlite`; it does not connect to PostgreSQL at runtime. The snapshot contains only the listing, host-name, and neighborhood fields used by the dashboard.
+
+To rebuild the snapshot after refreshing the local database, run from the project root:
+
+    .venv\Scripts\python.exe Database\export_dashboard_snapshot.py
+
+The exporter reads the URL from `AIRBNB_DATABASE_URL` or `[connections.airbnb_db]` in the user-local Streamlit secrets file. It uses the read-only `airbnb_dashboard_ro` account and writes a compact SQLite file. Keep credentials outside the repository. Commit the refreshed SQLite file when you want the hosted dashboard to use a newer snapshot.
+
+For a local PostgreSQL setup, run the role setup SQL as a PostgreSQL administrator:
 
     psql -h 127.0.0.1 -U postgres -d airbnb_athens -f Dashboard/Database/create_dashboard_readonly.sql
 
-Set a password interactively so it is not written into project files or shell history:
+Set the read-only role password interactively:
 
     psql -h 127.0.0.1 -U postgres -d airbnb_athens
     \password airbnb_dashboard_ro
     \q
 
-Create the user-local Streamlit secrets file at:
-
-    %USERPROFILE%\.streamlit\secrets.toml
-
-Add the connection URL, replacing the placeholder with the role password:
+Create `%USERPROFILE%\.streamlit\secrets.toml` with this connection:
 
     [connections.airbnb_db]
     url = "postgresql+psycopg://airbnb_dashboard_ro:YOUR_PASSWORD@127.0.0.1:5432/airbnb_athens"
 
-Keep this secrets file outside the repository. The role has column-level SELECT access to dashboard fields only.
-
-For the current Windows account in this workspace, the read-only role and user-local Streamlit connection secret have already been provisioned. The steps above are for re-creating the setup or configuring another user.
+The role has column-level SELECT access to dashboard fields only. The local secret file is ignored by Git.
 
 ## Run
 
-From the project root, start the app from `Dashboard` so Streamlit loads its local theme configuration:
+From the project root, start the app from `Dashboard` so Streamlit loads its theme configuration:
 
     Set-Location Dashboard
     ..\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
 
-The dashboard shows the listing scrape date range stored in PostgreSQL. It queries listing summaries and does not load the larger daily calendar table.
+The dashboard shows the listing scrape date range embedded in the snapshot. The export omits the larger daily calendar table.
 
 ## Definitions and limitations
 
