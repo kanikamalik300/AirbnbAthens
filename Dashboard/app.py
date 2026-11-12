@@ -24,6 +24,7 @@ from dashboard_queries import (
     get_room_type_counts,
     get_room_type_options,
     get_top_hosts,
+    get_top_neighborhood,
 )
 
 
@@ -290,6 +291,7 @@ common_args = (
 try:
     overview = _first_row(get_overview_counts(*common_args))
     room_counts = get_room_type_counts(*common_args)
+    top_neighborhood = _first_row(get_top_neighborhood(*common_args))
     activity_metrics = _first_row(get_activity_metrics(*common_args))
     occupancy_distribution = get_occupancy_distribution(*common_args)
     license_distribution = get_license_distribution(*common_args)
@@ -331,6 +333,16 @@ with tabs[0]:
         st.metric("Listings in selection", f"{total_listings:,}", border=True)
         st.metric("Entire homes/apartments", f"{entire_homes:,}", border=True)
         st.metric("License values recorded", f"{license_recorded:,}", border=True)
+    if total_listings and top_neighborhood:
+        entire_home_share = 100 * entire_homes / total_listings
+        top_neighborhood_count = _int_value(top_neighborhood.get("listing_count"))
+        top_neighborhood_share = 100 * top_neighborhood_count / total_listings
+        st.markdown(
+            "**Key insight:** Entire homes/apartments make up "
+            f"{entire_home_share:.1f}% of this selection. "
+            f"{top_neighborhood.get('neighborhood')} has the most listings, "
+            f"with {top_neighborhood_count:,} ({top_neighborhood_share:.1f}%)."
+        )
 
     chart_col, map_col = st.columns([1, 2], gap="large")
     with chart_col:
@@ -414,6 +426,24 @@ with tabs[1]:
     activity_listing_count = _int_value(activity_row.get("listing_count"))
     price_count = _int_value(activity_row.get("listings_with_price"))
     revenue_count = _int_value(activity_row.get("listings_with_revenue"))
+    if occupancy_distribution.empty:
+        known_occupancy_count = 0
+        zero_occupancy_count = 0
+    else:
+        known_occupancy = occupancy_distribution.loc[
+            occupancy_distribution["nights_bucket"] != "Unknown", "listing_count"
+        ]
+        known_occupancy_count = int(known_occupancy.sum())
+        zero_occupancy_count = int(
+            occupancy_distribution.loc[
+                occupancy_distribution["nights_bucket"] == "0", "listing_count"
+            ].sum()
+        )
+    zero_occupancy_share = (
+        100 * zero_occupancy_count / known_occupancy_count
+        if known_occupancy_count
+        else 0
+    )
     with st.grid("auto", min_column_width=190, gap="small"):
         st.metric(
             "Recent & frequent listings" if activity_only else "Listings in selection",
@@ -451,62 +481,41 @@ with tabs[1]:
     st.caption(
         "Revenue averages use rows with an estimate; missing values are excluded, not treated as zero."
     )
-    st.markdown("#### Room type mix")
-    if not _show_empty(room_counts, "No room types match the selected filters."):
-        room_mix = room_counts.copy()
-        room_mix["room_type"] = room_mix["room_type"].fillna("Unknown")
-        room_mix_total = int(room_mix["listing_count"].sum())
-        room_mix["share_percent"] = (
-            room_mix["listing_count"] / room_mix_total * 100
-            if room_mix_total
+    if average_nights is not None and known_occupancy_count:
+        occupancy_insight = (
+            f"Listings average {float(average_nights):.1f} estimated booked nights per year "
+            f"({average_occupancy:.1f}% occupancy); {zero_occupancy_count:,} of "
+            f"{known_occupancy_count:,} with estimates ({zero_occupancy_share:.1f}%) are at zero."
+        )
+    else:
+        occupancy_insight = "Occupancy estimates are unavailable for this selection."
+    st.markdown(
+        f"**Key insight:** {occupancy_insight} Average nightly price is "
+        f"{_format_euro(activity_row.get('average_nightly_price_eur'))} across "
+        f"{price_count:,} priced listings; estimated annual revenue averages "
+        f"{_format_euro(activity_row.get('average_estimated_revenue_eur'))} "
+        f"across {revenue_count:,} listings."
+    )
+    if not _show_empty(
+        occupancy_distribution,
+        "No activity estimates match the selected filters.",
+    ):
+        occupancy_mix = occupancy_distribution.copy()
+        occupancy_total = int(occupancy_mix["listing_count"].sum())
+        occupancy_mix["share_percent"] = (
+            occupancy_mix["listing_count"] / occupancy_total * 100
+            if occupancy_total
             else 0
         )
-        room_mix["count_and_share"] = room_mix.apply(
+        occupancy_mix["count_and_share"] = occupancy_mix.apply(
             lambda row: (
                 f"{int(row['listing_count']):,} "
                 f"({row['share_percent']:.1f}%)"
             ),
             axis=1,
         )
-        room_mix_fig = px.bar(
-            room_mix,
-            x="share_percent",
-            y="room_type",
-            color="room_type",
-            orientation="h",
-            text="count_and_share",
-            color_discrete_map=ROOM_TYPE_COLORS,
-            hover_data={
-                "listing_count": True,
-                "share_percent": ":.1f",
-                "count_and_share": False,
-            },
-            labels={
-                "room_type": "Room type",
-                "share_percent": "Share of selected listings (%)",
-                "listing_count": "Listings",
-            },
-        )
-        room_mix_fig.update_traces(textposition="outside", cliponaxis=False)
-        room_mix_fig.update_layout(
-            margin={"l": 4, "r": 36, "t": 8, "b": 4},
-            xaxis_title="Share of selected listings (%)",
-            yaxis={"categoryorder": "total ascending"},
-        )
-        _style_figure(room_mix_fig)
-        st.plotly_chart(
-            room_mix_fig,
-            width="stretch",
-            config={"displayModeBar": False},
-            alt="Horizontal bar chart of room types with listing counts and percentages",
-        )
-        st.caption("Counts and percentages reflect the current sidebar filters.")
-    if not _show_empty(
-        occupancy_distribution,
-        "No activity estimates match the selected filters.",
-    ):
         occupancy_fig = px.bar(
-            occupancy_distribution,
+            occupancy_mix,
             x="nights_bucket",
             y="listing_count",
             color_discrete_sequence=[PLOT_COLORS["teal"]],
@@ -525,19 +534,27 @@ with tabs[1]:
             labels={
                 "nights_bucket": "Estimated booked nights in last 365 days",
                 "listing_count": "Listings",
+                "share_percent": "Share of selected listings (%)",
             },
-            text="listing_count",
+            hover_data={"share_percent": ":.1f"},
+            text="count_and_share",
         )
+        max_occupancy_count = int(occupancy_mix["listing_count"].max())
+        occupancy_fig.update_traces(textposition="outside", cliponaxis=False)
         occupancy_fig.update_layout(
-            margin={"l": 4, "r": 4, "t": 8, "b": 4},
+            margin={"l": 4, "r": 4, "t": 32, "b": 4},
             xaxis_title="Estimated booked nights in last 365 days",
+            yaxis={"range": [0, max_occupancy_count * 1.2]},
         )
         _style_figure(occupancy_fig)
         st.plotly_chart(
             occupancy_fig,
             width="stretch",
             config={"displayModeBar": False},
-            alt="Bar chart showing listings by estimated booked-night range",
+            alt="Listings by estimated booked-night range, with counts and percentages",
+        )
+        st.caption(
+            "Percentages use all listings in the selected data, including listings without an occupancy estimate."
         )
 
 with tabs[2]:
@@ -554,6 +571,15 @@ with tabs[2]:
         st.metric("License value recorded", f"{recorded_count:,}", border=True)
         st.metric("Explicitly marked exempt", f"{exempt_count:,}", border=True)
         st.metric("Blank license field", f"{blank_count:,}", border=True)
+    license_total = recorded_count + exempt_count + blank_count
+    if license_total:
+        st.markdown(
+            "**Key insight:** "
+            f"{recorded_count:,} listings ({100 * recorded_count / license_total:.1f}%) "
+            f"have a non-exempt value recorded; {blank_count:,} "
+            f"({100 * blank_count / license_total:.1f}%) are blank and {exempt_count:,} "
+            f"({100 * exempt_count / license_total:.1f}%) are marked exempt."
+        )
     st.caption(
         "“Marked exempt” counts only an explicit exempt marker in the raw field. "
         "A recorded value or marker does not verify legal status."
@@ -597,16 +623,35 @@ with tabs[3]:
 
     with st.grid("auto", min_column_width=210, gap="small"):
         st.metric(
-            f"Under {minimum_nights_cutoff} nights (meets threshold)",
-            f"{below_cutoff:,} ({below_share:.1f}%)",
+            "Short-term rental",
+            f"{below_share:.1f}%",
+            delta=f"{below_cutoff:,} listings",
+            delta_color="off",
+            delta_arrow="off",
             border=True,
         )
         st.metric(
-            f"{minimum_nights_cutoff}+ nights (longer minimum stay)",
-            f"{at_or_above_cutoff:,} ({at_or_above_share:.1f}%)",
+            "Long-term rental",
+            f"{at_or_above_share:.1f}%",
+            delta=f"{at_or_above_cutoff:,} listings",
+            delta_color="off",
+            delta_arrow="off",
             border=True,
         )
         st.metric("Missing minimum-night value", f"{missing_minimum:,}", border=True)
+    if minimum_valid:
+        minimum_nights_insight = (
+            f"{below_cutoff:,} of {minimum_valid:,} listings with minimum-night data "
+            f"({below_share:.1f}%) are below the {minimum_nights_cutoff}-night cutoff; "
+            f"{at_or_above_cutoff:,} ({at_or_above_share:.1f}%) are at or above it, "
+            f"and {missing_minimum:,} listings have no value."
+        )
+    else:
+        minimum_nights_insight = (
+            f"No listings in this selection have a minimum-night value; "
+            f"all {missing_minimum:,} are missing one."
+        )
+    st.markdown(f"**Key insight:** {minimum_nights_insight}")
     st.caption(
         f"Percentages use the {minimum_valid:,} listings with a minimum-night value. "
         "This is an analytic threshold, not a legal classification or proof of actual stay length."
@@ -693,54 +738,28 @@ with tabs[4]:
             border=True,
         )
     st.caption(
-        "Single- and multi-listing host totals cover the full dataset. The portfolio chart and table cover only the 20 hosts with the most listings."
+        "Single- and multi-listing host totals cover the full dataset. The table covers the 20 hosts with the most listings."
     )
     if not _show_empty(top_hosts, "No host records are available."):
-        host_distribution = (
-            top_hosts.groupby("listing_count", as_index=False)
-            .agg(host_count=("host_id", "count"))
-            .rename(columns={"listing_count": "listings_per_host"})
-            .sort_values("listings_per_host", ascending=True)
+        host_count = _int_value(host_row.get("host_count"))
+        single_listing_hosts = _int_value(host_row.get("single_listing_hosts"))
+        single_host_share = (
+            100 * single_listing_hosts / host_count if host_count else 0
         )
-        host_distribution["listings_per_host_label"] = host_distribution[
-            "listings_per_host"
-        ].map(lambda value: f"{int(value):,} listings")
-        host_fig = px.bar(
-            host_distribution,
-            x="host_count",
-            y="listings_per_host_label",
-            orientation="h",
-            text="host_count",
-            custom_data=["listings_per_host"],
-            labels={
-                "host_count": "Number of hosts",
-                "listings_per_host_label": "Listings per host",
-            },
-            color_discrete_sequence=[PLOT_COLORS["teal"]],
+        top_20_listing_count = int(top_hosts["listing_count"].sum())
+        citywide_listing_count = _int_value(metadata.get("listing_count"))
+        top_20_listing_share = (
+            100 * top_20_listing_count / citywide_listing_count
+            if citywide_listing_count
+            else 0
         )
-        host_fig.update_layout(
-            yaxis={
-                "categoryorder": "array",
-                "categoryarray": host_distribution[
-                    "listings_per_host_label"
-                ].tolist(),
-                "title": "Listings per host (top 20)",
-            },
-            xaxis_title="Number of hosts",
-            margin={"l": 4, "r": 4, "t": 8, "b": 4},
-        )
-        host_fig.update_traces(
-            hovertemplate=(
-                "%{x} host(s)<br>%{customdata[0]} listings per host"
-                "<extra></extra>"
-            )
-        )
-        _style_figure(host_fig)
-        st.plotly_chart(
-            host_fig,
-            width="stretch",
-            config={"displayModeBar": False},
-            alt="Horizontal bar chart showing the number of top-20 hosts at each listings-per-host count",
+        largest_host = top_hosts.iloc[0]
+        st.markdown(
+            f"**Key insight:** {single_listing_hosts:,} of {host_count:,} hosts "
+            f"({single_host_share:.1f}%) have one listing. The top 20 hosts account "
+            f"for {top_20_listing_count:,} listings ({top_20_listing_share:.1f}% of "
+            f"citywide supply), led by {largest_host['host_name']} "
+            f"with {int(largest_host['listing_count']):,}."
         )
         st.markdown("#### Listing mix for the top 20 hosts")
         display_hosts = top_hosts.rename(

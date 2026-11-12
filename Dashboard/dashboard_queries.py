@@ -86,6 +86,33 @@ def get_neighborhood_options(connection: Any):
     )
 
 
+def get_top_neighborhood(
+    connection: Any,
+    neighborhoods: Sequence[str] | None,
+    room_types: Sequence[str] | None,
+    activity_only: bool,
+    snapshot_date: date | None,
+):
+    where, params = _filters(
+        neighborhoods, room_types, activity_only, snapshot_date
+    )
+    return _query(
+        connection,
+        f"""
+        SELECT {NEIGHBORHOOD_EXPR} AS neighborhood,
+               COUNT(l.listing_id) AS listing_count
+        FROM public.listings AS l
+        LEFT JOIN public.neighbourhoods AS n
+          ON n.neighbourhood_name = l.neighbourhood_fk
+        {where}
+        GROUP BY neighborhood
+        ORDER BY listing_count DESC, neighborhood
+        LIMIT 1
+        """,
+        params,
+    )
+
+
 def get_room_type_options(connection: Any):
     return _query(
         connection,
